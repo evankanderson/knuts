@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"os/exec"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey"
@@ -35,14 +37,19 @@ var buildTemplateCmd = &cobra.Command{
 		}
 
 		installs := []builds.BuildTemplate{}
-		yamls := []string{}
 		for _, n := range *selected {
 			b := byName[n]
 			installs = append(installs, b)
-			yamls = append(yamls, b.URL)
+			err := b.Install()
+			if err != nil {
+				if ee, ok := err.(*exec.ExitError); ok {
+					fmt.Printf("Failed to install %s (%s): %v:\n%s\n", b.Short, b.Desc, ee, ee.Stderr)
+				} else {
+				fmt.Printf("Failed to install %s (%s): %v\n", b.Short, b.Desc, err)
+				}
+				// For now, continue to the next install
+			}
 		}
-
-		fmt.Printf("Got the following builds: %s\n", yamls)
 	},
 }
 
@@ -61,6 +68,7 @@ func fromPrompt(m map[string]builds.BuildTemplate) *[]string {
 		buildChoices[i] = fmt.Sprintf("%s: %s", v.Short, v.Desc)
 		i++
 	}
+	sort.Strings(buildChoices)
 	prompt := &survey.MultiSelect{
 		Message: "Which BuildTemplates do you want to install?",
 		Options: buildChoices,

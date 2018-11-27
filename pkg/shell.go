@@ -13,3 +13,13 @@ func Installed(command string) error {
 	}
 	return err
 }
+
+// Apply a yaml file with kubectl. Kubectl is not amenable to being called as a library.
+func Kubectl(file string) error {
+	cmd := exec.Command("kubectl", "apply", "--filename", file)
+	if DryRun {
+		fmt.Printf("Dry run: `kubectl --filename %q`\n", file)
+		return nil
+	}
+	return cmd.Run()
+}

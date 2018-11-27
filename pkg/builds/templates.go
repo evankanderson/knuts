@@ -1,5 +1,9 @@
 package builds
 
+import (
+	"github.com/evankanderson/knuts/pkg"
+)
+
 // BuildTemplate represents the steps needed to install a particular BuildTemplate.
 type BuildTemplate struct {
 	// Short is a single-word command-line flag name for the BuildTemplate.
@@ -38,4 +42,8 @@ var Builds = []BuildTemplate{
 		URL:     "https://github.com/knative/build-templates/blob/master/buildpack/buildpack.yaml",
 		Secrets: []SecretType{ImagePush},
 	},
+}
+
+func (f BuildTemplate) Install() error {
+	return pkg.Kubectl(f.URL)
 }
