@@ -1,3 +1,5 @@
+cloud.google.com/go v0.33.1 h1:fmJQWZ1w9PGkHR1YL/P7HloDvqlmKQ4Vpb7PC2e+aCk=
+cloud.google.com/go v0.33.1/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/AlecAivazis/survey v1.7.0 h1:Hri7k8HCumnCO2ks0BjjYZdnLVL3b/nvfUjUUVJtHGs=
 github.com/AlecAivazis/survey v1.7.0/go.mod h1:MVECab6WqEH1aXhj8nKIwF7HEAJAj2bhhGiSjNy3wII=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
@@ -14,5 +16,11 @@ github.com/spf13/cobra v0.0.3 h1:ZlrZ4XsMRm04Fr5pSFxBgfND2EBVa1nLpiy1stUsX/8=
 github.com/spf13/cobra v0.0.3/go.mod h1:1l0Ry5zgKvJasoi3XT1TypsSe7PqH0Sj9dhYf7v3XqQ=
 github.com/spf13/pflag v1.0.3 h1:zPAT6CGy6wXeQ7NtTnaTerfKOsV6V6F8agHXFiazDkg=
 github.com/spf13/pflag v1.0.3/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=
+golang.org/x/net v0.0.0-20181114220301-adae6a3d119a h1:gOpx8G595UYyvj8UK4+OFyY4rx037g3fmfhe5SasG3U=
+golang.org/x/net v0.0.0-20181114220301-adae6a3d119a/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
+golang.org/x/oauth2 v0.0.0-20181120190819-8f65e3013eba h1:YDkOrzGLLYybtuP6ZgebnO4OWYEYVMFSniazXsxrFN8=
+golang.org/x/oauth2 v0.0.0-20181120190819-8f65e3013eba/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
+google.golang.org/api v0.0.0-20181126234655-bed42c95df7d h1:gnVrknQY8QFJ07E1fALKqnJh7vs/gtGpIIZR1S5a+/k=
+google.golang.org/api v0.0.0-20181126234655-bed42c95df7d/go.mod h1:4mhQ8q/RsB7i+udVvVy5NUi08OU8ZlA0gRVgrF7VFY0=
 gopkg.in/AlecAivazis/survey.v1 v1.7.0 h1:Gr+2QDJ4t2YifLZBDpyq98f4+KcXYbNadCPqwxAdLB4=
 gopkg.in/AlecAivazis/survey.v1 v1.7.0/go.mod h1:2Ehl7OqkBl3Xb8VmC4oFW2bItAhnUfzIjrOzwRxCrOU=

@@ -44,6 +44,7 @@ var Builds = []BuildTemplate{
 	},
 }
 
+// Install causes the BuildTemplate to be installed in the current kubernetes context.
 func (f BuildTemplate) Install() error {
 	return pkg.Kubectl(f.URL)
 }
