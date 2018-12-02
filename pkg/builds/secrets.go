@@ -3,11 +3,17 @@ package builds
 import (
 	"context"
 	"fmt"
+	"net/http"
+
+	"github.com/evankanderson/knuts/pkg"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	servicemanagement "google.golang.org/api/servicemanagement/v1"
+	// iamProto "google.golang.org/genproto/googleapis/iam/admin/v1"
+	// iam "cloud.google.com/go/iam/admin/apiv1"
+	iam "google.golang.org/api/iam/v1"
+	serviceusage "google.golang.org/api/serviceusage/v1"
 )
 
 // Secret represents a process for requesting configuration of a secret
@@ -70,39 +76,100 @@ func (g GCPSecret) Secret() []byte {
 		return []byte{} // TODO: error handling
 	}
 	fmt.Printf("Using project %s to create services and enable registry", creds.ProjectID)
-	http := oauth2.NewClient(ctx, creds.TokenSource)
+	client := oauth2.NewClient(ctx, creds.TokenSource)
 
-	smAPI, err := servicemanagement.New(http)
+	project := "projects" + creds.ProjectID
+	// Step 1: ensure the correct services are enabled
+	err = g.ensureServices(client, project, []string{"iam.googleapis.com", "containerregistry.googleapis.com"})
 	if err != nil {
 		return []byte{}
 	}
-	smService := servicemanagement.NewServicesService(smAPI)
-	opService := servicemanagement.NewOperationsService(smAPI)
-	// Step 1: ensure the correct services are enabled
-	ops := []*servicemanagement.Operation{}
-	for _, s := range []string{"iam", "containerregistry"} {
-		op, err := smService.Enable(s, &servicemanagement.EnableServiceRequest{ConsumerId: fmt.Sprintf(creds.ProjectID)}).Do()
-		if err != nil {
-			return []byte{}
-		}
-		ops = append(ops, op)
-	}
-	for len(ops) > 0 {
-		for i, op := range ops {
-			op, err := opService.Get(op.Name).Do()
-			if err != nil {
-				return []byte{}
-			}
-			if op.Done {
-				ops = append(ops[:i], ops[i+1:]...)
-			}
-		}
-	}
 	// Step 2: Create IAM Service account
+	err = g.createServiceAccount(client, project)
+	if err != nil {
+		return []byte{}
+	}
+
+	//	iam.CreateServiceAccount(ctx, &iamProto.CreateServiceAccountRequest{Name: fmt.Sprintf("projects/%s", creds.ProjectID),
+	//		AccountId: "push-image"})
 
 	// Step 3: Assign new service account `roles.storage.admin` to all `*.artifacts.$project.artifacts.appspot.com` buckets
 
 	// Step 4: Create a JSON Key for the Service Account
 
 	return []byte{}
+}
+
+func (g GCPSecret) ensureServices(client *http.Client, project string, apis []string) error {
+	smAPI, err := serviceusage.New(client)
+	if err != nil {
+		return err
+	}
+	// Check to see if we need to enable anything
+	required := map[string]bool{}
+	for _, a := range apis {
+		required[a] = true
+	}
+	token := ""
+	for len(required) > 0 {
+		list, err := smAPI.Services.List(project).Filter("state:ENABLED").PageToken(token).Do()
+		if err != nil {
+			return err // TODO: should we just try to enable blindly?
+		}
+		for _, s := range list.Services {
+			if required[s.Config.Name] {
+				delete(required, s.Config.Name)
+			}
+		}
+		token = list.NextPageToken
+		if token == "" {
+			break
+		}
+	}
+	if len(required) == 0 {
+		fmt.Printf("All services already enabled: %v\n", apis)
+		return nil
+	}
+	apis = []string{}
+	for api := range required {
+		apis = append(apis, api)
+	}
+	if pkg.DryRun {
+		fmt.Printf("Enabling APIs: %s", apis)
+	}
+
+	op, err := smAPI.Services.BatchEnable(
+		project,
+		&serviceusage.BatchEnableServicesRequest{ServiceIds: apis}).Do()
+	if err != nil {
+		return err
+	}
+	for !op.Done {
+		op, err = smAPI.Operations.Get(op.Name).Do()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (g GCPSecret) createServiceAccount(client *http.Client, project string) error {
+	iamAPI, err := iam.New(client)
+	if err != nil {
+		return err
+	}
+	if pkg.DryRun {
+		fmt.Printf("Creating IAM account push-image in %s\n", project)
+	}
+	saService := iam.NewProjectsServiceAccountsService(iamAPI)
+	sa, err := saService.Create(project,
+		&iam.CreateServiceAccountRequest{
+			AccountId: "push-image", 
+			ServiceAccount: &iam.ServiceAccount{DisplayName: "Push images from cluster build"},
+			}).Do()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Created ServiceAccount: %v", sa)
+	return nil
 }
