@@ -1,9 +1,11 @@
 package builds
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
+	"text/template"
 
 	"github.com/evankanderson/knuts/pkg"
 
@@ -16,78 +18,84 @@ import (
 	serviceusage "google.golang.org/api/serviceusage/v1"
 )
 
-// Secret represents a process for requesting configuration of a secret
-type Secret interface {
-	// Provider is a one short description of the secret provider
-	Provider() string
+// ImageSecret contains the information needed to create an image push secret for build templates.
+type ImageSecret struct {
+	// Provider is a one word short description of the secret provider (used as the secret name).
+	Provider string
+	// Hosts describes the registry patterns which this secret applies to.
+	Hosts []string
+	// Username is the username used to authenticate to the registry.
+	Username string
 	// TODO: return a k8s secret object to be applied to the destination.
-	Secret() []byte
+	Password string
 }
 
-// SecretType is an enum representing the different types of Secrets which a
-// BuildTemplate might need.
-type SecretType int
+// ProduceK8sSecret creates a kubernetes Secret objects suitable for application via kubectl.
+func ProduceK8sSecret(s ImageSecret) ([]byte, error) {
+	t, err := template.New("secret").Parse(`
+apiVersion: v1
+kind: Secret
+metadata:
+	name: {{ .Provider }}
+	annotations:
+	{{range $idx, $host := .Hosts}}
+		build.knative.dev/docker-{{$idx}}: {{$host}}
+	{{end}}
+type: kubernetes.io/basic-auth
+data:
+	username: {{ .Username }}
+	password: $(openssl base64 -a -A < image-push-key.json)
+`)
+	if err != nil {
+		return nil, err
+	}
 
-const (
-	// ImagePush secrets contain credentials for talking to an image registry.
-	ImagePush SecretType = iota
-	// GitPull secrets contain credentials for interacting with a remote git repo.
-	GitPull
-)
-
-type imageProviders map[SecretType][]Secret
-
-// KnownSecrets contains the known providers for different secret types.
-var KnownSecrets = imageProviders{
-	ImagePush: {prompt{}},
-	GitPull:   {prompt{}},
+	var b bytes.Buffer
+	err = t.Execute(&b, s)
+	return b.Bytes(), err
 }
 
-type prompt struct {
-	content string
+func Prompt() (ImageSecret, error) {
+	fmt.Printf("This is where we would prompt for data")
+	return ImageSecret{
+		Provider: "prompted",
+		Hosts: []string{"docker.io"},
+		Username: "prompted",
+		Password: "",
+	}, nil
 }
 
-func (prompt) Provider() string {
-	return "static string"
-}
-
-func (prompt) Secret() []byte {
-	fmt.Print("This would ask for a string and stuff it into a secret.")
-	return []byte{}
-}
-
-// GCPSecret contains the data needed to return a GCP image push secret
-type GCPSecret struct {
-	serviceAccount string
-	refreshToken   string
-}
-
-// Provider is part of the Secret interface.
-func (g GCPSecret) Provider() string {
-	return "google-cloud-platform"
+func GCRSecret() (ImageSecret, error) {
+	s, err := setupGCPSecret()
+	return ImageSecret{
+		Provider: "google-cloud-platform",
+		Hosts: []string{"us.gcr.io", "gcr.io", "eu.gcr.io", "asia.gcr.io"},
+		Username: "X2pzb25fa2V5",  // base64 encoded "_json_key"
+		Password: s,
+	}, err
 }
 
 // Secret is part of the Secret interface.
-func (g GCPSecret) Secret() []byte {
+func setupGCPSecret() (string, error) {
 	ctx := context.Background()
 	creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		fmt.Printf("Failed to fetch default credentials: %v", err)
-		return []byte{} // TODO: error handling
+		return "", err // TODO: error handling
 	}
 	fmt.Printf("Using project %s to create services and enable registry", creds.ProjectID)
 	client := oauth2.NewClient(ctx, creds.TokenSource)
 
 	project := "projects" + creds.ProjectID
 	// Step 1: ensure the correct services are enabled
-	err = g.ensureServices(client, project, []string{"iam.googleapis.com", "containerregistry.googleapis.com"})
+	err = ensureGCPServices(client, project, []string{"iam.googleapis.com", "containerregistry.googleapis.com"})
 	if err != nil {
-		return []byte{}
+		return "", err
 	}
 	// Step 2: Create IAM Service account
-	err = g.createServiceAccount(client, project)
+	err = createGCPServiceAccount(client, project)
 	if err != nil {
-		return []byte{}
+		return "", err
 	}
 
 	//	iam.CreateServiceAccount(ctx, &iamProto.CreateServiceAccountRequest{Name: fmt.Sprintf("projects/%s", creds.ProjectID),
@@ -97,10 +105,10 @@ func (g GCPSecret) Secret() []byte {
 
 	// Step 4: Create a JSON Key for the Service Account
 
-	return []byte{}
+	return "", nil
 }
 
-func (g GCPSecret) ensureServices(client *http.Client, project string, apis []string) error {
+func ensureGCPServices(client *http.Client, project string, apis []string) error {
 	smAPI, err := serviceusage.New(client)
 	if err != nil {
 		return err
@@ -153,7 +161,7 @@ func (g GCPSecret) ensureServices(client *http.Client, project string, apis []st
 	return nil
 }
 
-func (g GCPSecret) createServiceAccount(client *http.Client, project string) error {
+func createGCPServiceAccount(client *http.Client, project string) error {
 	iamAPI, err := iam.New(client)
 	if err != nil {
 		return err
@@ -164,9 +172,9 @@ func (g GCPSecret) createServiceAccount(client *http.Client, project string) err
 	saService := iam.NewProjectsServiceAccountsService(iamAPI)
 	sa, err := saService.Create(project,
 		&iam.CreateServiceAccountRequest{
-			AccountId: "push-image", 
+			AccountId:      "push-image",
 			ServiceAccount: &iam.ServiceAccount{DisplayName: "Push images from cluster build"},
-			}).Do()
+		}).Do()
 	if err != nil {
 		return err
 	}
