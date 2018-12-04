@@ -17,6 +17,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&pkg.DryRun, "dry_run", true, "When true, print operations rather than executing them.")
+	rootCmd.PersistentFlags().StringVar(&pkg.GCPProject, "gcp_project", "", "GCP Project to use for GCP operations")
 }
 
 // Execute is the root Cobra command.

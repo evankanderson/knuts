@@ -50,6 +50,46 @@ var buildTemplateCmd = &cobra.Command{
 				// For now, continue to the next install
 			}
 		}
+		if len(installs) > 0 {
+			// Prompt for secret.
+			secretOpts := &survey.MultiSelect{
+				Message: "Set up image push for which registries?",
+				Options: []string{"Manual prompt", "GCR.io"},
+			}
+			answers := []string{}
+			err := survey.AskOne(secretOpts, &answers, nil)
+			if err != nil {
+				fmt.Printf("Failed reading registration: %v", err)
+				return
+			}
+			secrets := []builds.ImageSecret{}
+			for _, a := range answers {
+				switch a {
+				case "Manual prompt":
+					s, err := builds.Prompt()
+					if err != nil {
+						fmt.Printf("Failed to generated prompted Secret: %v.", err)
+						continue
+					}
+					secrets = append(secrets, s)
+				case "GCR.io":
+					s, err := builds.GCRSecret()
+					if err != nil {
+						fmt.Printf("Failed to generate GCR Secret: %v", err)
+						continue
+					}
+					secrets = append(secrets, s)
+				}
+			}
+			for _, s := range secrets {
+				out, err := builds.ProduceK8sSecret(s)
+				if err != nil {
+					fmt.Printf("Skipping secret %q: %v", s.Provider, err)
+					continue
+				}
+				fmt.Printf("%s\n", out)
+			}
+		}
 	},
 }
 

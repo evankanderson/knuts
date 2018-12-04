@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"text/template"
 
 	"github.com/evankanderson/knuts/pkg"
@@ -37,10 +38,8 @@ apiVersion: v1
 kind: Secret
 metadata:
 	name: {{ .Provider }}
-	annotations:
-	{{range $idx, $host := .Hosts}}
-		build.knative.dev/docker-{{$idx}}: {{$host}}
-	{{end}}
+	annotations:{{range $idx, $host := .Hosts}}
+		build.knative.dev/docker-{{$idx}}: {{$host}}{{end}}
 type: kubernetes.io/basic-auth
 data:
 	username: {{ .Username }}
@@ -55,22 +54,24 @@ data:
 	return b.Bytes(), err
 }
 
+// Prompt will ask the user for credentials.
 func Prompt() (ImageSecret, error) {
 	fmt.Printf("This is where we would prompt for data")
 	return ImageSecret{
 		Provider: "prompted",
-		Hosts: []string{"docker.io"},
+		Hosts:    []string{"docker.io"},
 		Username: "prompted",
 		Password: "",
 	}, nil
 }
 
+// GCRSecret will create and grant permissions for a dedicated service account to call GCR.io.
 func GCRSecret() (ImageSecret, error) {
 	s, err := setupGCPSecret()
 	return ImageSecret{
 		Provider: "google-cloud-platform",
-		Hosts: []string{"us.gcr.io", "gcr.io", "eu.gcr.io", "asia.gcr.io"},
-		Username: "X2pzb25fa2V5",  // base64 encoded "_json_key"
+		Hosts:    []string{"us.gcr.io", "gcr.io", "eu.gcr.io", "asia.gcr.io"},
+		Username: "X2pzb25fa2V5", // base64 encoded "_json_key"
 		Password: s,
 	}, err
 }
@@ -80,23 +81,26 @@ func setupGCPSecret() (string, error) {
 	ctx := context.Background()
 	creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
-		fmt.Printf("Failed to fetch default credentials: %v", err)
-		return "", err // TODO: error handling
+		return "", fmt.Errorf("Failed to fetch default credentials: %v", err)
 	}
-	fmt.Printf("Using project %s to create services and enable registry", creds.ProjectID)
+	if creds.ProjectID == "" {
+		creds.ProjectID = pkg.GetGCPProject()
+	}
+	fmt.Printf("Using project %q to create services and enable registry\n", creds.ProjectID)
 	client := oauth2.NewClient(ctx, creds.TokenSource)
 
-	project := "projects" + creds.ProjectID
+	project := "projects/" + creds.ProjectID
 	// Step 1: ensure the correct services are enabled
 	err = ensureGCPServices(client, project, []string{"iam.googleapis.com", "containerregistry.googleapis.com"})
 	if err != nil {
 		return "", err
 	}
 	// Step 2: Create IAM Service account
-	err = createGCPServiceAccount(client, project)
+	sa, err := createGCPServiceAccount(client, project)
 	if err != nil {
 		return "", err
 	}
+	fmt.Printf("Created ServiceAccount %q", sa.Email)
 
 	//	iam.CreateServiceAccount(ctx, &iamProto.CreateServiceAccountRequest{Name: fmt.Sprintf("projects/%s", creds.ProjectID),
 	//		AccountId: "push-image"})
@@ -143,7 +147,7 @@ func ensureGCPServices(client *http.Client, project string, apis []string) error
 		apis = append(apis, api)
 	}
 	if pkg.DryRun {
-		fmt.Printf("Enabling APIs: %s", apis)
+		fmt.Printf("Enabling APIs: %s\n", apis)
 	}
 
 	op, err := smAPI.Services.BatchEnable(
@@ -158,26 +162,31 @@ func ensureGCPServices(client *http.Client, project string, apis []string) error
 			return err
 		}
 	}
-	return nil
+	if op.Error != nil {
+		return fmt.Errorf("Service enablement failed: %v", op.Error.Message)
+	}
+	return nil // TODO: check for op.Error
 }
 
-func createGCPServiceAccount(client *http.Client, project string) error {
+func createGCPServiceAccount(client *http.Client, project string) (*iam.ServiceAccount, error) {
 	iamAPI, err := iam.New(client)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	shortProject := strings.TrimPrefix(project, "projects/")
+	saName := "push-image"
+	saEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", saName, shortProject)
 	if pkg.DryRun {
-		fmt.Printf("Creating IAM account push-image in %s\n", project)
+		fmt.Printf("Creating IAM account %q in %s\n", saName, project)
 	}
 	saService := iam.NewProjectsServiceAccountsService(iamAPI)
-	sa, err := saService.Create(project,
+	existing, err := saService.Get(project + "/serviceAccounts/" + saEmail).Do()
+	if err == nil && existing.Email == saEmail {
+		return existing, nil
+	}
+	return saService.Create(project,
 		&iam.CreateServiceAccountRequest{
-			AccountId:      "push-image",
+			AccountId:      saName,
 			ServiceAccount: &iam.ServiceAccount{DisplayName: "Push images from cluster build"},
 		}).Do()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Created ServiceAccount: %v", sa)
-	return nil
 }
