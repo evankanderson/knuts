@@ -1,6 +1,7 @@
 package builds
 
 import (
+	"google.golang.org/api/storage/v1"
 	"bytes"
 	"context"
 	"fmt"
@@ -100,12 +101,15 @@ func setupGCPSecret() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Created ServiceAccount %q", sa.Email)
-
-	//	iam.CreateServiceAccount(ctx, &iamProto.CreateServiceAccountRequest{Name: fmt.Sprintf("projects/%s", creds.ProjectID),
-	//		AccountId: "push-image"})
+	fmt.Printf("Created ServiceAccount %q\n", sa.Email)
 
 	// Step 3: Assign new service account `roles.storage.admin` to all `*.artifacts.$project.artifacts.appspot.com` buckets
+	for _, region := range []string{"artifacts", "us.artifacts", "eu.artifacts", "asia.artifacts"} {
+		err := setIamPermissions(client, creds.ProjectID, region, sa)
+		if err != nil {
+			fmt.Printf("Failed to set permissions in %s: %v\n", region, err)
+		}
+	}
 
 	// Step 4: Create a JSON Key for the Service Account
 
@@ -189,4 +193,45 @@ func createGCPServiceAccount(client *http.Client, project string) (*iam.ServiceA
 			AccountId:      saName,
 			ServiceAccount: &iam.ServiceAccount{DisplayName: "Push images from cluster build"},
 		}).Do()
+}
+
+func setIamPermissions(client *http.Client, project string, region string, serviceAccount *iam.ServiceAccount) error {
+	storageAPI, err := storage.New(client)
+	if err != nil {
+		return err
+	}
+	bService := storage.NewBucketsService(storageAPI)
+	bucketName := fmt.Sprintf("%s.%s.appspot.com", region, project)
+	p, err := bService.GetIamPolicy(bucketName).Do()
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		p = &storage.Policy{}
+	}
+	var newBinding *storage.PolicyBindings
+	for _, binding := range p.Bindings {
+		if binding.Role == "roles/storage.admin" {
+			newBinding = binding
+			break
+		}
+	}
+	if newBinding == nil {
+		newBinding := &storage.PolicyBindings{
+			Role: "roles/storage.admin",
+		}
+		p.Bindings = append(p.Bindings, newBinding)
+	}
+	newMember := "serviceAccount:" + serviceAccount.Email
+	for _, m := range newBinding.Members {
+		if m == newMember {
+			newMember = "" // already present
+			break
+		}
+	}
+	if newMember != "" {
+		newBinding.Members = append(newBinding.Members, newMember)
+	}
+_, err = bService.SetIamPolicy(bucketName, p).Do()
+	return err
 }
