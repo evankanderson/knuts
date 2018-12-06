@@ -8,8 +8,8 @@ import (
 	"github.com/AlecAivazis/survey"
 )
 
+// DryRun is a global flag indicating that no write actions should be taken.
 var DryRun = true
-var GCPProject = ""
 
 // MultiSelect is a flags.Value implementing interface which selects one or
 // more items from a list of Options, and will prompt if no items are

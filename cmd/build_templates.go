@@ -65,6 +65,14 @@ var buildTemplateCmd = &cobra.Command{
 		}
 
 		if len(templates) > 0 {
+			// Create service account with access to created secrets
+			kubeSa := `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: builder
+secrets:
+`
 			// Set up registry secrets
 			secrets := []builds.ImageSecret{}
 			for _, f := range registries.Get().([]pkg.Option) {
@@ -82,7 +90,30 @@ var buildTemplateCmd = &cobra.Command{
 					fmt.Printf("Skipping secret %q: %v", s.Provider, err)
 					continue
 				}
-				fmt.Printf("%s\n", out)
+				if pkg.DryRun {
+					fmt.Printf("%s\n", out)
+					continue
+				}
+				err = pkg.KubectlInline(out)
+				if err != nil {
+					if ee, ok := err.(*exec.ExitError); ok {
+						fmt.Printf("Failed to apply secret for %s: %v:\n%s\n", s.Provider, ee, ee.Stderr)
+					} else {
+						fmt.Printf("Failed to apply secret for %s: %v\n", s.Provider, err)
+					}
+					// For now, continue to the next secret
+					continue
+				}
+				kubeSa = fmt.Sprintf("%s  - name: %s\n", kubeSa, s.Provider)
+			}
+
+			err := pkg.KubectlInline([]byte(kubeSa))
+			if err != nil {
+				if ee, ok := err.(*exec.ExitError); ok {
+					fmt.Printf("Failed to create ServiceAccount: %v:\n%s\n", ee, ee.Stderr)
+				} else {
+					fmt.Printf("Failed to create ServiceAccount: %v\n", err)
+				}
 			}
 		}
 	},

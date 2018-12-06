@@ -39,13 +39,13 @@ func ProduceK8sSecret(s ImageSecret) ([]byte, error) {
 apiVersion: v1
 kind: Secret
 metadata:
-	name: {{ .Provider }}
-	annotations:{{range $idx, $host := .Hosts}}
-		build.knative.dev/docker-{{$idx}}: {{$host}}{{end}}
+  name: {{ .Provider }}
+  annotations:{{range $idx, $host := .Hosts}}
+    build.knative.dev/docker-{{$idx}}: {{$host}}{{end}}
 type: kubernetes.io/basic-auth
 data:
-	username: {{ .Username }}
-	password: {{ .Password }}
+  username: {{ .Username }}
+  password: {{ .Password }}
 `)
 	if err != nil {
 		return nil, err
