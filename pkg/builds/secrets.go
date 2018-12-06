@@ -67,8 +67,8 @@ func Prompt() (ImageSecret, error) {
 }
 
 // GCRSecret will create and grant permissions for a dedicated service account to call GCR.io.
-func GCRSecret() (ImageSecret, error) {
-	s, err := setupGCPSecret()
+func GCRSecret(project string) (ImageSecret, error) {
+	s, err := setupGCPSecret(project)
 	return ImageSecret{
 		Provider: "google-cloud-platform",
 		Hosts:    []string{"us.gcr.io", "gcr.io", "eu.gcr.io", "asia.gcr.io"},
@@ -78,19 +78,19 @@ func GCRSecret() (ImageSecret, error) {
 }
 
 // Secret is part of the Secret interface.
-func setupGCPSecret() (string, error) {
+func setupGCPSecret(project string) (string, error) {
 	ctx := context.Background()
 	creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return "", fmt.Errorf("Failed to fetch default credentials: %v", err)
 	}
 	if creds.ProjectID == "" {
-		creds.ProjectID = pkg.GetGCPProject()
+		creds.ProjectID = project
 	}
 	fmt.Printf("Using project %q to create services and enable registry\n", creds.ProjectID)
 	client := oauth2.NewClient(ctx, creds.TokenSource)
 
-	project := "projects/" + creds.ProjectID
+	project = "projects/" + creds.ProjectID
 	// Step 1: ensure the correct services are enabled
 	err = ensureGCPServices(client, project, []string{"iam.googleapis.com", "containerregistry.googleapis.com"})
 	if err != nil {
@@ -217,8 +217,9 @@ func setIamPermissions(client *http.Client, project string, region string, servi
 		}
 	}
 	if newBinding == nil {
-		newBinding := &storage.PolicyBindings{
+		newBinding = &storage.PolicyBindings{
 			Role: "roles/storage.admin",
+			Members: []string{},
 		}
 		p.Bindings = append(p.Bindings, newBinding)
 	}
@@ -231,6 +232,10 @@ func setIamPermissions(client *http.Client, project string, region string, servi
 	}
 	if newMember != "" {
 		newBinding.Members = append(newBinding.Members, newMember)
+	}
+	if pkg.DryRun {
+		fmt.Printf("Would add %s to %s\n", newMember, bucketName)
+		return nil
 	}
 _, err = bService.SetIamPolicy(bucketName, p).Do()
 	return err
