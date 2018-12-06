@@ -180,13 +180,17 @@ func createGCPServiceAccount(client *http.Client, project string) (*iam.ServiceA
 	shortProject := strings.TrimPrefix(project, "projects/")
 	saName := "push-image"
 	saEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", saName, shortProject)
-	if pkg.DryRun {
-		fmt.Printf("Creating IAM account %q in %s\n", saName, project)
-	}
 	saService := iam.NewProjectsServiceAccountsService(iamAPI)
 	existing, err := saService.Get(project + "/serviceAccounts/" + saEmail).Do()
 	if err == nil && existing.Email == saEmail {
 		return existing, nil
+	}
+	if pkg.DryRun {
+		fmt.Printf("Creating IAM account %q in %s\n", saName, project)
+		return &iam.ServiceAccount{
+			Email:    saEmail,
+			UniqueId: "1234",
+		}, nil
 	}
 	return saService.Create(project,
 		&iam.CreateServiceAccountRequest{
@@ -250,7 +254,7 @@ func getSAKey(client *http.Client, sa *iam.ServiceAccount) (string, error) {
 	if pkg.DryRun {
 		return "FAKE", nil
 	}
-	key, err := keyService.Create("projects/-/serviceAccounts/" + sa.UniqueId, &iam.CreateServiceAccountKeyRequest{}).Do()
+	key, err := keyService.Create("projects/-/serviceAccounts/"+sa.UniqueId, &iam.CreateServiceAccountKeyRequest{}).Do()
 	if err != nil {
 		return "", err
 	}

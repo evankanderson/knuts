@@ -53,7 +53,7 @@ var buildTemplateCmd = &cobra.Command{
 		for _, t := range templates {
 			b := builds.BuildTemplate(t)
 			err := b.Install()
-			
+
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok {
 					fmt.Printf("Failed to install %s: %v:\n%s\n", b.Description, ee, ee.Stderr)
