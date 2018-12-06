@@ -14,7 +14,7 @@ func init() {
 	rootCmd.AddCommand(buildTemplateCmd)
 	buildTemplateCmd.PersistentFlags().Var(&builds.Builds, "templates", builds.Builds.Description)
 	buildTemplateCmd.PersistentFlags().Var(&gcpProject, "gcp_project", gcpProject.Description)
-	buildTemplateCmd.PersistentFlags().Var(&registries, "registries", registries.Description)
+	buildTemplateCmd.PersistentFlags().Var(&registries, "registry", registries.Description)
 }
 
 var (

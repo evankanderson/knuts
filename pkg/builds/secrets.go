@@ -1,13 +1,14 @@
 package builds
 
 import (
-	"google.golang.org/api/storage/v1"
 	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"strings"
 	"text/template"
+
+	"google.golang.org/api/storage/v1"
 
 	"github.com/evankanderson/knuts/pkg"
 
@@ -28,7 +29,7 @@ type ImageSecret struct {
 	Hosts []string
 	// Username is the username used to authenticate to the registry.
 	Username string
-	// TODO: return a k8s secret object to be applied to the destination.
+	// Password is string-formatted private authentication data.
 	Password string
 }
 
@@ -44,7 +45,7 @@ metadata:
 type: kubernetes.io/basic-auth
 data:
 	username: {{ .Username }}
-	password: $(openssl base64 -a -A < image-push-key.json)
+	password: {{ .Password }}
 `)
 	if err != nil {
 		return nil, err
@@ -112,8 +113,7 @@ func setupGCPSecret(project string) (string, error) {
 	}
 
 	// Step 4: Create a JSON Key for the Service Account
-
-	return "", nil
+	return getSAKey(client, sa)
 }
 
 func ensureGCPServices(client *http.Client, project string, apis []string) error {
@@ -218,7 +218,7 @@ func setIamPermissions(client *http.Client, project string, region string, servi
 	}
 	if newBinding == nil {
 		newBinding = &storage.PolicyBindings{
-			Role: "roles/storage.admin",
+			Role:    "roles/storage.admin",
 			Members: []string{},
 		}
 		p.Bindings = append(p.Bindings, newBinding)
@@ -237,6 +237,22 @@ func setIamPermissions(client *http.Client, project string, region string, servi
 		fmt.Printf("Would add %s to %s\n", newMember, bucketName)
 		return nil
 	}
-_, err = bService.SetIamPolicy(bucketName, p).Do()
+	_, err = bService.SetIamPolicy(bucketName, p).Do()
 	return err
+}
+
+func getSAKey(client *http.Client, sa *iam.ServiceAccount) (string, error) {
+	iamAPI, err := iam.New(client)
+	if err != nil {
+		return "", err
+	}
+	keyService := iam.NewProjectsServiceAccountsKeysService(iamAPI)
+	if pkg.DryRun {
+		return "FAKE", nil
+	}
+	key, err := keyService.Create("projects/-/serviceAccounts/" + sa.UniqueId, &iam.CreateServiceAccountKeyRequest{}).Do()
+	if err != nil {
+		return "", err
+	}
+	return key.PrivateKeyData, nil
 }
