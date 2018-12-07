@@ -28,6 +28,15 @@ var (
 				Description: "Buildpack",
 				Data:        "https://raw.githubusercontent.com/knative/build-templates/master/buildpack/buildpack.yaml",
 			},
+			"bazel": {
+				Description: "Bazel with container_push rule",
+				Data:        "https://raw.githubusercontent.com/knative/build-templates/master/bazel/bazel.yaml",
+			},
+			"buildah": {
+				Description: "Buildah mechanism for building from Dockerfiles. Requires $BUILDER_IMAGE set in your Build.",
+				Data:        "https://raw.githubusercontent.com/knative/build-templates/master/buildah/buildah.yaml",
+			},
+			// TODO: buildkit is more complex, and may need additional cluster permissions.
 		},
 	}
 )
