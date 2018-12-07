@@ -8,16 +8,14 @@ import (
 	"strings"
 	"text/template"
 
-	"google.golang.org/api/storage/v1"
-
+	"github.com/AlecAivazis/survey"
 	"github.com/evankanderson/knuts/pkg"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	// iamProto "google.golang.org/genproto/googleapis/iam/admin/v1"
-	// iam "cloud.google.com/go/iam/admin/apiv1"
 	iam "google.golang.org/api/iam/v1"
+	"google.golang.org/api/storage/v1"
 	serviceusage "google.golang.org/api/serviceusage/v1"
 )
 
@@ -57,13 +55,18 @@ data:
 }
 
 // Prompt will ask the user for credentials.
-func Prompt() (ImageSecret, error) {
-	fmt.Printf("This is where we would prompt for data")
+func Prompt(username string) (ImageSecret, error) {
+	prompt := &survey.Password{ Message: "Enter your dockerhub password: " }
+	password := ""
+	survey.AskOne(prompt, &password, nil)
+	if pkg.DryRun {
+		password = "FAKE"
+	}
 	return ImageSecret{
-		Provider: "prompted",
+		Provider: "dockerhub",
 		Hosts:    []string{"docker.io"},
-		Username: "prompted",
-		Password: "",
+		Username: username,
+		Password: password,
 	}, nil
 }
 

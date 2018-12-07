@@ -14,6 +14,7 @@ func init() {
 	rootCmd.AddCommand(buildTemplateCmd)
 	buildTemplateCmd.PersistentFlags().Var(&builds.Builds, "templates", builds.Builds.Description)
 	buildTemplateCmd.PersistentFlags().Var(&gcpProject, "gcp_project", gcpProject.Description)
+		buildTemplateCmd.PersistentFlags().Var(&dockerUser, "docker_username", dockerUser.Description)
 	buildTemplateCmd.PersistentFlags().Var(&registries, "registry", registries.Description)
 }
 
@@ -23,7 +24,9 @@ var (
 		Options: map[string]pkg.Option{
 			"docker": {
 				Description: "Docker (user secret)",
-				Data:        builds.Prompt,
+				Data:        func() (builds.ImageSecret, error) {
+					return builds.Prompt(dockerUser.Get().(string))
+				},
 			},
 			"gcr.io": {
 				Description: "Google Container Registry",
@@ -35,6 +38,9 @@ var (
 	}
 	gcpProject = pkg.Prompt{
 		Description: "GCP Project to push images to",
+	}
+	dockerUser = pkg.Prompt{
+		Description: "Docker Hub username",
 	}
 )
 
