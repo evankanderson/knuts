@@ -13,6 +13,7 @@ type Component struct {
 	Yaml        string
 	hidden      bool
 	provides    string
+	preferred   bool
 	deps        []string
 }
 
@@ -64,6 +65,10 @@ DEP:
 				}
 				choice := componentMap[opt]
 				menu[opt] = pkg.Option{Description: choice.Description, Data: choice}
+				if choice.preferred {
+					unresolved = append([]string{opt}, unresolved...)
+					continue DEP
+				}
 			}
 			// TODO: this should be a single-select
 			prompt := &pkg.MultiSelect{
@@ -117,6 +122,7 @@ var (
 			hidden:      true,
 			provides:    "istio",
 			deps:        []string{"istio-crd"},
+			preferred:   true,
 		},
 		{
 			Name:        "istio-lean",
