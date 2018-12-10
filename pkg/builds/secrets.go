@@ -15,8 +15,8 @@ import (
 	"golang.org/x/oauth2/google"
 
 	iam "google.golang.org/api/iam/v1"
-	"google.golang.org/api/storage/v1"
 	serviceusage "google.golang.org/api/serviceusage/v1"
+	"google.golang.org/api/storage/v1"
 )
 
 // ImageSecret contains the information needed to create an image push secret for build templates.
@@ -56,7 +56,7 @@ data:
 
 // Prompt will ask the user for credentials.
 func Prompt(username string) (ImageSecret, error) {
-	prompt := &survey.Password{ Message: "Enter your dockerhub password: " }
+	prompt := &survey.Password{Message: "Enter your dockerhub password: "}
 	password := ""
 	survey.AskOne(prompt, &password, nil)
 	if pkg.DryRun {

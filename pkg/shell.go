@@ -18,7 +18,7 @@ func Installed(command string) error {
 func Kubectl(file string) error {
 	cmd := exec.Command("kubectl", "apply", "--filename", file)
 	if DryRun {
-		fmt.Printf("Dry run: `kubectl --filename %q`\n", file)
+		fmt.Printf("Dry run: `kubectl apply --filename %q`\n", file)
 		return nil
 	}
 	return cmd.Run()
@@ -28,7 +28,7 @@ func Kubectl(file string) error {
 func KubectlInline(contents []byte) error {
 	cmd := exec.Command("kubectl", "apply", "--filename", "-")
 	if DryRun {
-		fmt.Printf("Dry run: `kubectl < INPUT`\n")
+		fmt.Printf("Dry run: `kubectl apply < INPUT`\n")
 		return nil
 	}
 	in, err := cmd.StdinPipe()
