@@ -100,7 +100,7 @@ secrets:
 					fmt.Printf("%s\n", out)
 					continue
 				}
-				err = pkg.KubectlInline(out)
+				err = pkg.KubectlInline(out, os.Stdout)
 				if err != nil {
 					if ee, ok := err.(*exec.ExitError); ok {
 						fmt.Printf("Failed to apply secret for %s: %v:\n%s\n", s.Provider, ee, ee.Stderr)
@@ -113,7 +113,7 @@ secrets:
 				kubeSa = fmt.Sprintf("%s  - name: %s\n", kubeSa, s.Provider)
 			}
 
-			err := pkg.KubectlInline([]byte(kubeSa))
+			err := pkg.KubectlInline([]byte(kubeSa), os.Stdout)
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok {
 					fmt.Printf("Failed to create ServiceAccount: %v:\n%s\n", ee, ee.Stderr)

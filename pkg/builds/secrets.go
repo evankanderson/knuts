@@ -42,8 +42,8 @@ metadata:
     build.knative.dev/docker-{{$idx}}: {{$host}}{{end}}
 type: kubernetes.io/basic-auth
 data:
-  username: {{ .Username }}
-  password: {{ .Password }}
+  username: {{ printf "%q" .Username }}
+  password: {{ printf "%q" .Password }}
 `)
 	if err != nil {
 		return nil, err

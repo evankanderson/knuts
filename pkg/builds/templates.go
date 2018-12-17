@@ -1,6 +1,8 @@
 package builds
 
 import (
+	"os"
+
 	"github.com/evankanderson/knuts/pkg"
 )
 
@@ -43,5 +45,5 @@ var (
 
 // Install causes the BuildTemplate to be installed in the current kubernetes context.
 func (f BuildTemplate) Install() error {
-	return pkg.Kubectl(f.Data.(string))
+	return pkg.Kubectl(f.Data.(string), os.Stdout)
 }

@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -15,8 +16,10 @@ func Installed(command string) error {
 }
 
 // Kubectl applies a yaml file with kubectl. Kubectl is not amenable to being called as a library.
-func Kubectl(file string) error {
+func Kubectl(file string, output *os.File) error {
 	cmd := exec.Command("kubectl", "apply", "--filename", file)
+	cmd.Stdout = output
+	cmd.Stderr = output
 	if DryRun {
 		fmt.Printf("Dry run: `kubectl apply --filename %q`\n", file)
 		return nil
@@ -25,8 +28,10 @@ func Kubectl(file string) error {
 }
 
 // KubectlInline applies suplied yaml contents with kubectl. Kubectl is not amenable to being called as a library.
-func KubectlInline(contents []byte) error {
+func KubectlInline(contents []byte, output *os.File) error {
 	cmd := exec.Command("kubectl", "apply", "--filename", "-")
+	cmd.Stdout = output
+	cmd.Stderr = output
 	if DryRun {
 		fmt.Printf("Dry run: `kubectl apply < INPUT`\n")
 		return nil

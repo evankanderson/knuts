@@ -35,7 +35,7 @@ var installCmd = &cobra.Command{
 			work = component.Expand(work)
 		}
 		for _, w := range work {
-			pkg.Kubectl(w.Yaml)
+			pkg.Kubectl(w.Yaml, os.Stdout)
 		}
 	},
 }
